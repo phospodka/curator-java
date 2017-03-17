@@ -308,7 +308,7 @@ public class OperationsImpl implements Operations {
      * @return boolean if index is closed
      * @throws IOException
      */
-    private boolean isIndexClosed(String index, Client client) throws IOException {
+    protected boolean isIndexClosed(String index, Client client) throws IOException {
         ClusterStateRequest request = ClusterStateAction.INSTANCE.newRequestBuilder(client)
                 .setIndices(index)
                 .request();
@@ -324,7 +324,7 @@ public class OperationsImpl implements Operations {
      * @param snapshotName name of snapshot to lookup
      * @return boolean whether snapshot exists
      */
-    private boolean isSnapshotExists(Client client, String snapshotName) {
+    protected boolean isSnapshotExists(Client client, String snapshotName) {
         boolean exists = true;
 
         try {

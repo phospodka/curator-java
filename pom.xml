@@ -71,6 +71,21 @@
             </exclusions>
             <scope>test</scope>
         </dependency>
+
+        <dependency>
+            <groupId>org.apache.lucene</groupId>
+            <artifactId>lucene-test-framework</artifactId>
+            <version>5.5.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.elasticsearch</groupId>
+            <artifactId>elasticsearch</artifactId>
+            <version>2.3.4</version>
+            <scope>test</scope>
+            <type>test-jar</type>
+        </dependency>
     </dependencies>
 
     <build>
