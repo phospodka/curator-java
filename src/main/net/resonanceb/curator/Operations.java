@@ -92,10 +92,10 @@ public interface Operations {
 
     /**
      * Find the list of all indices that are before the cutoff time.
-     * @param options {@link Options} options to use with the find all operation
+     * @param indexOptions {@link IndexOptions} options to use with the find all operation
      * @param client {@link Client} for elasticsearch
      * @return {@link List} of indices that match the options
      * @throws IOException
      */
-    List<String> findAllIndices(@NotNull Options options, @NotNull Client client) throws IOException;
+    List<String> findAllIndices(@NotNull IndexOptions indexOptions, @NotNull Client client) throws IOException;
 }

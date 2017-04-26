@@ -15,16 +15,11 @@
     </properties>
 
     <dependencies>
+        <!-- core dependencies -->
         <dependency>
             <groupId>org.elasticsearch</groupId>
             <artifactId>elasticsearch</artifactId>
             <version>2.3.4</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.json</groupId>
-            <artifactId>json</artifactId>
-            <version>20151123</version>
         </dependency>
 
         <dependency>
@@ -33,6 +28,7 @@
             <version>1.1.0.Final</version>
         </dependency>
 
+        <!-- logging dependencies -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>

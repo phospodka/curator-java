@@ -5,7 +5,7 @@ import org.joda.time.LocalDate;
 /**
  * Options POJO used to pass to elasticsearch when searching for indices.
  */
-public class Options {
+public class IndexOptions {
 
     private String prefix;
 

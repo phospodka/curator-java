@@ -8,4 +8,12 @@ package net.resonanceb.curator;
  */
 public interface Curator {
 
+    // close
+
+    // delete
+
+    // backup
+
+    // forceMerge
+
 }

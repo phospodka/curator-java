@@ -1,7 +1,7 @@
 package net.resonanceb.curator.impl;
 
 import net.resonanceb.curator.Operations;
-import net.resonanceb.curator.Options;
+import net.resonanceb.curator.IndexOptions;
 
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesAction;
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesRequest;
@@ -205,17 +205,17 @@ public class OperationsImpl implements Operations {
     }
 
     @Override
-    public List<String> findAllIndices(@NotNull Options options, @NotNull Client client) throws IOException {
-        LOGGER.debug("Finding all indices using options:{}", options);
-        String[] indices = getIndices(client, options.getPrefix(), options.isIncludeOpen(), options.isIncludeClosed());
+    public List<String> findAllIndices(@NotNull IndexOptions indexOptions, @NotNull Client client) throws IOException {
+        LOGGER.debug("Finding all indices using options:{}", indexOptions);
+        String[] indices = getIndices(client, indexOptions.getPrefix(), indexOptions.isIncludeOpen(), indexOptions.isIncludeClosed());
 
         List<String> expiredIndices = new ArrayList<>();
 
         for(String index : indices) {
-            String suffix = index.substring(options.getPrefix().length());
+            String suffix = index.substring(indexOptions.getPrefix().length());
             LocalDate indexTime = getIndexDate(suffix);
 
-            if(indexTime.isBefore(options.getCutoff())) {
+            if(indexTime.isBefore(indexOptions.getCutoff())) {
                 expiredIndices.add(index);
             }
         }
