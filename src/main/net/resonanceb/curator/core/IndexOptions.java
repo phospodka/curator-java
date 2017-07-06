@@ -1,4 +1,4 @@
-package net.resonanceb.curator;
+package net.resonanceb.curator.core;
 
 import org.joda.time.LocalDate;
 
@@ -45,5 +45,13 @@ public class IndexOptions {
 
     public void setCutoff(LocalDate cutoff) {
         this.cutoff = cutoff;
+    }
+
+    @Override
+    public String toString() {
+        return "prefix=" + prefix
+                + "; includeOpen=" + includeOpen
+                + "; includeClosed=" + includeClosed
+                + "; cutoff=" + cutoff;
     }
 }

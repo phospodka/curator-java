@@ -1,4 +1,4 @@
-package net.resonanceb.curator;
+package net.resonanceb.curator.core;
 
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesResponse;
 import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsResponse;

@@ -1,7 +1,7 @@
-package net.resonanceb.curator.impl;
+package net.resonanceb.curator.core.impl;
 
-import net.resonanceb.curator.Operations;
-import net.resonanceb.curator.IndexOptions;
+import net.resonanceb.curator.core.Operations;
+import net.resonanceb.curator.core.IndexOptions;
 
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesAction;
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesRequest;

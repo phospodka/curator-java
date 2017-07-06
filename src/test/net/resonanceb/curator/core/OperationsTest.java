@@ -1,4 +1,4 @@
-package net.resonanceb.curator;
+package net.resonanceb.curator.core;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -8,7 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import net.resonanceb.curator.impl.OperationsImpl;
+import net.resonanceb.curator.core.impl.OperationsImpl;
 
 import org.elasticsearch.action.ActionFuture;
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesRequest;

@@ -1,4 +1,4 @@
-package net.resonanceb.curator;
+package net.resonanceb.curator.core;
 
 public class RepositoryOptions {
 
