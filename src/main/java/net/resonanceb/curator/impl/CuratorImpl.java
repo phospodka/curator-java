@@ -8,6 +8,7 @@ import net.resonanceb.curator.core.Operations;
 import net.resonanceb.curator.core.impl.OperationsImpl;
 
 import org.elasticsearch.client.Client;
+import org.elasticsearch.client.RestHighLevelClient;
 import org.joda.time.LocalDate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +31,7 @@ public class CuratorImpl implements Curator {
         options.setIncludeOpen(true);
         options.setCutoff(LocalDate.now().minusDays(Settings.closeCutoff));
 
-        try (Client client = elasticClient.getClient()) {
+        try (RestHighLevelClient client = elasticClient.getClient()) {
             for (String prefix : Settings.prefixes) {
                 options.setPrefix(prefix);
 
@@ -54,7 +55,7 @@ public class CuratorImpl implements Curator {
         options.setIncludeOpen(true);
         options.setCutoff(LocalDate.now().minusDays(Settings.deleteCutoff));
 
-        try (Client client = elasticClient.getClient()) {
+        try (RestHighLevelClient client = elasticClient.getClient()) {
             for (String prefix : Settings.prefixes) {
                 options.setPrefix(prefix);
 
@@ -78,7 +79,7 @@ public class CuratorImpl implements Curator {
         options.setIncludeOpen(true);
         options.setCutoff(LocalDate.now().minusDays(Settings.backupCutoff));
 
-        try (Client client = elasticClient.getClient()) {
+        try (RestHighLevelClient client = elasticClient.getClient()) {
             for (String prefix : Settings.prefixes) {
                 options.setPrefix(prefix);
 
@@ -102,7 +103,7 @@ public class CuratorImpl implements Curator {
         options.setIncludeOpen(true);
         options.setCutoff(LocalDate.now().minusDays(Settings.forceMergeCutoff));
 
-        try (Client client = elasticClient.getClient()) {
+        try (RestHighLevelClient client = elasticClient.getClient()) {
             for (String prefix : Settings.prefixes) {
                 options.setPrefix(prefix);
 

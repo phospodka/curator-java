@@ -3,6 +3,7 @@ package net.resonanceb.curator.core;
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesResponse;
 import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsResponse;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.client.RestHighLevelClient;
 
 import java.io.IOException;
 import java.util.List;
@@ -20,7 +21,7 @@ public interface Operations {
      * @param client {@link Client} for elasticsearch
      * @throws IOException
      */
-    void createSnapshot(@NotNull String index, @NotNull Client client) throws IOException;
+    void createSnapshot(@NotNull String index, @NotNull RestHighLevelClient client) throws IOException;
 
     /**
      * Delete a snapshot of the index to the system defined repository.
@@ -28,7 +29,7 @@ public interface Operations {
      * @param client {@link Client} for elasticsearch
      * @throws IOException
      */
-    void deleteSnapshot(@NotNull String snapshot, @NotNull Client client) throws IOException;
+    void deleteSnapshot(@NotNull String snapshot, @NotNull RestHighLevelClient client) throws IOException;
 
     /**
      * Get the snapsnot from the system defined repository.
@@ -37,7 +38,7 @@ public interface Operations {
      * @return {@link GetSnapshotsResponse}
      * @throws IOException
      */
-    GetSnapshotsResponse getSnapshot(String snapshotName, Client client) throws IOException;
+    GetSnapshotsResponse getSnapshot(String snapshotName, RestHighLevelClient client) throws IOException;
 
     /**
      * Create a repository to the system defined location.
@@ -45,7 +46,7 @@ public interface Operations {
      * @param client {@link Client} for elasticsearch
      * @throws IOException
      */
-    void createRepository(Client client) throws IOException;
+    void createRepository(RestHighLevelClient client) throws IOException;
 
     /**
      * Get the system defined repository.
@@ -54,7 +55,7 @@ public interface Operations {
      * @return {@link GetRepositoriesResponse}
      * @throws IOException
      */
-    GetRepositoriesResponse getRepository(Client client) throws IOException;
+    GetRepositoriesResponse getRepository(RestHighLevelClient client) throws IOException;
 
     /**
      * Close the index.  This prevents it from being searched but is still stored in the cluster state.
@@ -62,7 +63,7 @@ public interface Operations {
      * @param client {@link Client} for elasticsearch
      * @throws IOException
      */
-    void closeIndex(@NotNull String index, @NotNull Client client) throws IOException;
+    void closeIndex(@NotNull String index, @NotNull RestHighLevelClient client) throws IOException;
 
     /**
      * Delete the index.  This permanently removes it from the file system.
@@ -70,7 +71,7 @@ public interface Operations {
      * @param client {@link Client} for elasticsearch
      * @throws IOException
      */
-    void deleteIndex(@NotNull String index, @NotNull Client client) throws IOException;
+    void deleteIndex(@NotNull String index, @NotNull RestHighLevelClient client) throws IOException;
 
     /**
      * Open the index.  This reopens a previously closed index to make it available for search.
@@ -78,7 +79,7 @@ public interface Operations {
      * @param client {@link Client} for elasticsearch
      * @throws IOException
      */
-    void openIndex(@NotNull String index, @NotNull Client client) throws IOException;
+    void openIndex(@NotNull String index, @NotNull RestHighLevelClient client) throws IOException;
 
     /**
      * Force merge the segments of an index.  This will reduce the number of segments segments to the max provided.
@@ -87,7 +88,7 @@ public interface Operations {
      * @param client {@link Client} for elasticsearch
      * @throws IOException
      */
-    void forceMergeIndex(@NotNull String index, int maxSegments, @NotNull Client client) throws IOException;
+    void forceMergeIndex(@NotNull String index, int maxSegments, @NotNull RestHighLevelClient client) throws IOException;
 
 
     /**
@@ -97,5 +98,5 @@ public interface Operations {
      * @return {@link List} of indices that match the options
      * @throws IOException
      */
-    List<String> findAllIndices(@NotNull IndexOptions indexOptions, @NotNull Client client) throws IOException;
+    List<String> findAllIndices(@NotNull IndexOptions indexOptions, @NotNull RestHighLevelClient client) throws IOException;
 }

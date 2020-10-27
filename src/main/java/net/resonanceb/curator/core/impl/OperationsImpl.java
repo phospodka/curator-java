@@ -1,16 +1,12 @@
 package net.resonanceb.curator.core.impl;
 
-import net.resonanceb.curator.core.Operations;
 import net.resonanceb.curator.core.IndexOptions;
+import net.resonanceb.curator.core.Operations;
 
-import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesAction;
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesRequest;
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesResponse;
-import org.elasticsearch.action.admin.cluster.repositories.put.PutRepositoryAction;
 import org.elasticsearch.action.admin.cluster.repositories.put.PutRepositoryRequest;
-import org.elasticsearch.action.admin.cluster.snapshots.create.CreateSnapshotAction;
 import org.elasticsearch.action.admin.cluster.snapshots.create.CreateSnapshotRequest;
-import org.elasticsearch.action.admin.cluster.snapshots.delete.DeleteSnapshotAction;
 import org.elasticsearch.action.admin.cluster.snapshots.delete.DeleteSnapshotRequest;
 import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsAction;
 import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsRequest;
@@ -18,8 +14,6 @@ import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsResponse
 import org.elasticsearch.action.admin.cluster.state.ClusterStateAction;
 import org.elasticsearch.action.admin.cluster.state.ClusterStateRequest;
 import org.elasticsearch.action.admin.cluster.state.ClusterStateResponse;
-import org.elasticsearch.action.admin.indices.close.CloseIndexAction;
-import org.elasticsearch.action.admin.indices.close.CloseIndexRequest;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.admin.indices.forcemerge.ForceMergeAction;
 import org.elasticsearch.action.admin.indices.forcemerge.ForceMergeRequest;
@@ -36,6 +30,9 @@ import org.elasticsearch.action.admin.indices.settings.get.GetSettingsRequest;
 import org.elasticsearch.action.admin.indices.settings.get.GetSettingsResponse;
 import org.elasticsearch.action.support.IndicesOptions;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.client.RequestOptions;
+import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.indices.CloseIndexRequest;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.snapshots.SnapshotMissingException;
 import org.joda.time.LocalDate;
@@ -62,7 +59,7 @@ public class OperationsImpl implements Operations {
     private static final String WILDCARD = "*";
 
     @Override
-    public void createSnapshot(@NotNull String index, @NotNull Client client) throws IOException {
+    public void createSnapshot(@NotNull String index, @NotNull RestHighLevelClient client) throws IOException {
         if(!isIndexClosed(index, client)) {
             LOGGER.debug("Creating snapshot for index:{}", index);
 
@@ -72,15 +69,14 @@ public class OperationsImpl implements Operations {
             // todo work more with incremental snapshot stuff to understand this better
             if (!isSnapshotExists(client, snapshotName)) {
 
-                CreateSnapshotRequest request = CreateSnapshotAction.INSTANCE.newRequestBuilder(client)
-                        .setRepository(REPOSITORY_NAME)
-                        .setIndices(index)
-                        .setIncludeGlobalState(false)
-                        .setWaitForCompletion(true)
-                        .setSnapshot(snapshotName)
-                        .request();
+                CreateSnapshotRequest request = new CreateSnapshotRequest()
+                        .repository(REPOSITORY_NAME)
+                        .indices(index)
+                        .includeGlobalState(false)
+                        .waitForCompletion(true)
+                        .snapshot(snapshotName);
 
-                client.admin().cluster().createSnapshot(request).actionGet();
+                client.snapshot().create(request, RequestOptions.DEFAULT);
             } else {
                 LOGGER.debug("Snapshot name:{} is already in use", snapshotName);
             }
@@ -90,71 +86,65 @@ public class OperationsImpl implements Operations {
     }
 
     @Override
-    public void deleteSnapshot(String snapshotName, Client client) {
+    public void deleteSnapshot(String snapshotName, RestHighLevelClient client) {
         try {
             LOGGER.debug("Deleting snapshot:{}", snapshotName);
 
-            DeleteSnapshotRequest deleteRequest = DeleteSnapshotAction.INSTANCE.newRequestBuilder(client)
-                    .setRepository(REPOSITORY_NAME)
-                    .setSnapshot(snapshotName)
-                    .request();
+            DeleteSnapshotRequest request = new DeleteSnapshotRequest()
+                    .repository(REPOSITORY_NAME)
+                    .snapshots(snapshotName);
 
-            client.admin().cluster().deleteSnapshot(deleteRequest).actionGet();
-        } catch(SnapshotMissingException e) {
+            client.snapshot().delete(request, RequestOptions.DEFAULT);
+        } catch(SnapshotMissingException | IOException e) {
             LOGGER.debug("Snapshot name:{} was not found for deletion", snapshotName);
         }
     }
 
     @Override
-    public GetSnapshotsResponse getSnapshot(String snapshotName, Client client) throws IOException {
+    public GetSnapshotsResponse getSnapshot(String snapshotName, RestHighLevelClient client) throws IOException {
         LOGGER.debug("Get repository:{}", REPOSITORY_NAME);
 
-        GetSnapshotsRequest getRequest = GetSnapshotsAction.INSTANCE.newRequestBuilder(client)
-                .setRepository(REPOSITORY_NAME)
-                .setSnapshots(snapshotName)
-                .request();
+        GetSnapshotsRequest request = new GetSnapshotsRequest()
+                .repository(REPOSITORY_NAME)
+                .snapshots(new String[]{snapshotName});
 
-        return client.admin().cluster().getSnapshots(getRequest).actionGet();
+        return client.snapshot().get(request, RequestOptions.DEFAULT);
     }
 
     @Override
-    public void createRepository(Client client) throws IOException {
+    public void createRepository(RestHighLevelClient client) throws IOException {
         LOGGER.debug("Creating repository:{}", REPOSITORY_NAME);
-        PutRepositoryRequest putRequest = PutRepositoryAction.INSTANCE.newRequestBuilder(client)
-                .setName(REPOSITORY_NAME)
-                .setType(REPOSITORY_TYPE)
-                .setSettings(Settings.settingsBuilder()
+        PutRepositoryRequest request = new PutRepositoryRequest()
+                .name(REPOSITORY_NAME)
+                .type(REPOSITORY_TYPE)
+                .settings(Settings.builder()
                         .put("compress", true)
                         .put("location", REPOSITORY_LOCATION)
                         .build()
-                )
-                .request();
+                );
 
-        client.admin().cluster().putRepository(putRequest).actionGet();
+        client.snapshot().createRepository(request, RequestOptions.DEFAULT);
     }
 
     @Override
-    public GetRepositoriesResponse getRepository(Client client) throws IOException {
+    public GetRepositoriesResponse getRepository(RestHighLevelClient client) throws IOException {
         LOGGER.debug("Get repository:{}", REPOSITORY_NAME);
 
-        GetRepositoriesRequest getRequest = GetRepositoriesAction.INSTANCE.newRequestBuilder(client)
-                .setRepositories(REPOSITORY_NAME)
-                .request();
+        GetRepositoriesRequest request = new GetRepositoriesRequest()
+                .repositories(new String[]{REPOSITORY_NAME});
 
-        return client.admin().cluster().getRepositories(getRequest).actionGet();
+        return client.snapshot().getRepository(request, RequestOptions.DEFAULT);
     }
 
     @Override
-    public void closeIndex(@NotNull String index, @NotNull Client client) throws IOException {
+    public void closeIndex(@NotNull String index, @NotNull RestHighLevelClient client) throws IOException {
         if(!isIndexClosed(index ,client)) {
 
             LOGGER.debug("Closing index:{}", index);
 
-            CloseIndexRequest request = CloseIndexAction.INSTANCE.newRequestBuilder(client)
-                    .setIndices(index)
-                    .request();
+            CloseIndexRequest request = new CloseIndexRequest(index);
 
-            client.admin().indices().close(request).actionGet();
+            client.indices().close(request, RequestOptions.DEFAULT);
 
         } else {
             LOGGER.debug("Attempting to close index:{} but it is already closed", index);
@@ -162,27 +152,26 @@ public class OperationsImpl implements Operations {
     }
 
     @Override
-    public void deleteIndex(@NotNull String index, @NotNull Client client) throws IOException {
+    public void deleteIndex(@NotNull String index, @NotNull RestHighLevelClient client) throws IOException {
         LOGGER.debug("Deleting index:{}", index);
 
-        client.admin().indices().delete(
-                new DeleteIndexRequest().indices(index)
-        ).actionGet();
+        DeleteIndexRequest request = new DeleteIndexRequest(index);
+
+        client.indices().delete(request, RequestOptions.DEFAULT);
     }
 
     @Override
-    public void openIndex(@NotNull String index, @NotNull Client client) throws IOException {
+    public void openIndex(@NotNull String index, @NotNull RestHighLevelClient client) throws IOException {
         LOGGER.debug("Opening index:{}", index);
 
-        OpenIndexRequest request = OpenIndexAction.INSTANCE.newRequestBuilder(client)
-                .setIndices(index)
-                .request();
+        OpenIndexRequest request = new OpenIndexRequest()
+                .indices(index);
 
-        client.admin().indices().open(request).actionGet();
+        client.indices().open(request, RequestOptions.DEFAULT);
     }
 
     @Override
-    public void forceMergeIndex(@NotNull String index, int maxSegments, @NotNull Client client) throws IOException {
+    public void forceMergeIndex(@NotNull String index, int maxSegments, @NotNull RestHighLevelClient client) throws IOException {
         if(!isIndexClosed(index, client)) {
             LOGGER.debug("Merging segments of index:{}", index);
 
@@ -192,12 +181,11 @@ public class OperationsImpl implements Operations {
             int segmentCount = counts[1];
 
             if(segmentCount > (shardCount * maxSegments)) {
-                ForceMergeRequest request = ForceMergeAction.INSTANCE.newRequestBuilder(client)
-                        .setIndices(index)
-                        .setMaxNumSegments(maxSegments)
-                        .request();
+                ForceMergeRequest request = new ForceMergeRequest()
+                        .indices(index)
+                        .maxNumSegments(maxSegments);
 
-                client.admin().indices().forceMerge(request).actionGet();
+                client.indices().forcemerge(request, RequestOptions.DEFAULT);
             }
         } else {
             LOGGER.debug("Attempting to merge index:{} but it is already closed", index);
@@ -205,7 +193,7 @@ public class OperationsImpl implements Operations {
     }
 
     @Override
-    public List<String> findAllIndices(@NotNull IndexOptions indexOptions, @NotNull Client client) throws IOException {
+    public List<String> findAllIndices(@NotNull IndexOptions indexOptions, @NotNull RestHighLevelClient client) throws IOException {
         LOGGER.debug("Finding all indices using options:{}", indexOptions);
         String[] indices = getIndices(client, indexOptions.getPrefix(), indexOptions.isIncludeOpen(), indexOptions.isIncludeClosed());
 
@@ -251,13 +239,12 @@ public class OperationsImpl implements Operations {
      * @return Array of index names
      * @throws IOException
      */
-    private String[] getIndices(Client client, String prefix, boolean includeOpen, boolean includeClosed) throws IOException {
-        GetSettingsRequest request = GetSettingsAction.INSTANCE.newRequestBuilder(client)
-                .setIndices(prefix + WILDCARD)
-                .setIndicesOptions(IndicesOptions.fromOptions(false, false, includeOpen, includeClosed))
-                .request();
+    private String[] getIndices(RestHighLevelClient client, String prefix, boolean includeOpen, boolean includeClosed) throws IOException {
+        GetSettingsRequest request = new GetSettingsRequest()
+                .indices(prefix + WILDCARD)
+                .indicesOptions(IndicesOptions.fromOptions(false, false, includeOpen, includeClosed));
 
-        GetSettingsResponse response = client.admin().indices().getSettings(request).actionGet();
+        GetSettingsResponse response = client.indices().getSettings(request, RequestOptions.DEFAULT);
 
         return response.getIndexToSettings().keys().toArray(String.class);
     }
@@ -268,8 +255,8 @@ public class OperationsImpl implements Operations {
      * @param client {@link Client} for elasticsearch
      * @return Array [number of shards, number of segments]
      */
-    private int[] getSegmentCount(String index, Client client) {
-        IndicesSegmentsRequest request = IndicesSegmentsAction.INSTANCE.newRequestBuilder(client)
+    private int[] getSegmentCount(String index, RestHighLevelClient client) {
+        /*IndicesSegmentsRequest request = IndicesSegmentsAction.INSTANCE.newRequestBuilder(client)
                 .setIndices(index)
                 .request();
 
@@ -297,7 +284,8 @@ public class OperationsImpl implements Operations {
             }
         }
 
-        return new int[]{shardCount, segmentCount};
+        return new int[]{shardCount, segmentCount};*/
+        return null;
     }
 
     /**
@@ -308,14 +296,15 @@ public class OperationsImpl implements Operations {
      * @return boolean if index is closed
      * @throws IOException
      */
-    protected boolean isIndexClosed(String index, Client client) throws IOException {
-        ClusterStateRequest request = ClusterStateAction.INSTANCE.newRequestBuilder(client)
+    protected boolean isIndexClosed(String index, RestHighLevelClient client) throws IOException {
+        /*ClusterStateRequest request = ClusterStateAction.INSTANCE.newRequestBuilder(client)
                 .setIndices(index)
                 .request();
 
         ClusterStateResponse response = client.admin().cluster().state(request).actionGet();
 
-        return response.getState().getMetaData().getIndices().get(index).getState().name().equalsIgnoreCase("close");
+        return response.getState().getMetaData().getIndices().get(index).getState().name().equalsIgnoreCase("close");*/
+        return false;
     }
 
     /**
@@ -324,17 +313,16 @@ public class OperationsImpl implements Operations {
      * @param snapshotName name of snapshot to lookup
      * @return boolean whether snapshot exists
      */
-    protected boolean isSnapshotExists(Client client, String snapshotName) {
+    protected boolean isSnapshotExists(RestHighLevelClient client, String snapshotName) {
         boolean exists = true;
 
         try {
-            GetSnapshotsRequest getRequest = GetSnapshotsAction.INSTANCE.newRequestBuilder(client)
-                    .setRepository(REPOSITORY_NAME)
-                    .setSnapshots(snapshotName)
-                    .request();
+            GetSnapshotsRequest request = new GetSnapshotsRequest()
+                    .repository(REPOSITORY_NAME)
+                    .snapshots(new String[]{snapshotName});
 
-            client.admin().cluster().getSnapshots(getRequest).actionGet();
-        } catch(SnapshotMissingException e) {
+            client.snapshot().get(request, RequestOptions.DEFAULT);
+        } catch(SnapshotMissingException | IOException e) {
             exists = false;
             LOGGER.debug("Snapshot name:{} is available to be created", snapshotName);
         }

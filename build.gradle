@@ -1,0 +1,24 @@
+group 'net.resonanceb'
+version '0.1-SNAPSHOT'
+
+apply plugin: 'java'
+apply plugin: 'maven'
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+sourceCompatibility = JavaVersion.VERSION_11
+targetCompatibility = JavaVersion.VERSION_11
+
+dependencies {
+    compile 'com.google.guava:guava:27.1-jre'
+    compile 'org.elasticsearch.client:elasticsearch-rest-high-level-client:7.9.3'
+    compile 'org.slf4j:slf4j-api:1.7.30'
+    compile 'javax.validation:validation-api:2.0.1.Final'
+    compile 'ch.qos.logback:logback-core:1.2.3'
+    compile 'ch.qos.logback:logback-classic:1.2.3'
+    testCompile 'junit:junit:4.13.1'
+    testCompile 'org.mockito:mockito-core:3.5.15'
+}
