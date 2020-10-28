@@ -3,34 +3,31 @@ package net.resonanceb.curator.core.impl;
 import net.resonanceb.curator.core.IndexOptions;
 import net.resonanceb.curator.core.Operations;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.http.util.EntityUtils;
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesRequest;
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesResponse;
 import org.elasticsearch.action.admin.cluster.repositories.put.PutRepositoryRequest;
 import org.elasticsearch.action.admin.cluster.snapshots.create.CreateSnapshotRequest;
 import org.elasticsearch.action.admin.cluster.snapshots.delete.DeleteSnapshotRequest;
-import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsAction;
 import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsRequest;
 import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsResponse;
-import org.elasticsearch.action.admin.cluster.state.ClusterStateAction;
-import org.elasticsearch.action.admin.cluster.state.ClusterStateRequest;
 import org.elasticsearch.action.admin.cluster.state.ClusterStateResponse;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
-import org.elasticsearch.action.admin.indices.forcemerge.ForceMergeAction;
 import org.elasticsearch.action.admin.indices.forcemerge.ForceMergeRequest;
-import org.elasticsearch.action.admin.indices.open.OpenIndexAction;
 import org.elasticsearch.action.admin.indices.open.OpenIndexRequest;
 import org.elasticsearch.action.admin.indices.segments.IndexSegments;
 import org.elasticsearch.action.admin.indices.segments.IndexShardSegments;
 import org.elasticsearch.action.admin.indices.segments.IndicesSegmentResponse;
-import org.elasticsearch.action.admin.indices.segments.IndicesSegmentsAction;
-import org.elasticsearch.action.admin.indices.segments.IndicesSegmentsRequest;
 import org.elasticsearch.action.admin.indices.segments.ShardSegments;
-import org.elasticsearch.action.admin.indices.settings.get.GetSettingsAction;
 import org.elasticsearch.action.admin.indices.settings.get.GetSettingsRequest;
 import org.elasticsearch.action.admin.indices.settings.get.GetSettingsResponse;
 import org.elasticsearch.action.support.IndicesOptions;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.client.Request;
 import org.elasticsearch.client.RequestOptions;
+import org.elasticsearch.client.Response;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.CloseIndexRequest;
 import org.elasticsearch.common.settings.Settings;
@@ -255,7 +252,7 @@ public class OperationsImpl implements Operations {
      * @param client {@link Client} for elasticsearch
      * @return Array [number of shards, number of segments]
      */
-    private int[] getSegmentCount(String index, RestHighLevelClient client) {
+    private int[] getSegmentCount(String index, RestHighLevelClient client) throws IOException {
         /*IndicesSegmentsRequest request = IndicesSegmentsAction.INSTANCE.newRequestBuilder(client)
                 .setIndices(index)
                 .request();
@@ -285,7 +282,44 @@ public class OperationsImpl implements Operations {
         }
 
         return new int[]{shardCount, segmentCount};*/
-        return null;
+        //logstash-2020.01.31/_segments?filter_path=indices.*.shards.*.num_committed_segments
+        //{"indices":{"logstash-2020.01.31":{"shards":{"0":[{"num_committed_segments":9}],"1":[{"num_committed_segments":10}],"2":[{"num_committed_segments":7}],"3":[{"num_committed_segments":8}],"4":[{"num_committed_segments":4}]}}}}
+
+        String endpoint = index + "/_segments?filter_path=indices.*.shards.*.num_committed_segments";
+        Request request = new Request("GET", endpoint);
+
+        Response response = client.getLowLevelClient().performRequest(request);
+        int statusCode = response.getStatusLine().getStatusCode();
+        String responseBody = EntityUtils.toString(response.getEntity());
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode responseJson = objectMapper.readTree(responseBody);
+        IndicesSegmentResponse indicesResponse = objectMapper.readValue(responseBody, IndicesSegmentResponse.class);
+
+        Map<String, IndexSegments> indexSegments = indicesResponse.getIndices();
+
+        int segmentCount = 0;
+        int shardCount = 0;
+
+        // Navigate the layers to get the total number of segments across all shards of the index
+        for(Map.Entry<String, IndexSegments> indexEntry : indexSegments.entrySet()) {
+            IndexSegments indexSegment = indexEntry.getValue();
+
+            Map<Integer, IndexShardSegments> indexShardSegments = indexSegment.getShards();
+
+            for(Map.Entry<Integer, IndexShardSegments> indexShardEntry : indexShardSegments.entrySet()) {
+                IndexShardSegments indexShardSegment = indexShardEntry.getValue();
+
+                ShardSegments[] shardSegments = indexShardSegment.getShards();
+
+                for(ShardSegments shardSegment : shardSegments) {
+                    ++shardCount;
+                    segmentCount += shardSegment.getSegments().size();
+                }
+            }
+        }
+
+        return new int[]{shardCount, segmentCount};
     }
 
     /**
@@ -304,7 +338,20 @@ public class OperationsImpl implements Operations {
         ClusterStateResponse response = client.admin().cluster().state(request).actionGet();
 
         return response.getState().getMetaData().getIndices().get(index).getState().name().equalsIgnoreCase("close");*/
-        return false;
+        //_cluster/state/metadata/logstash-2020.01.31?filter_path=metadata.indices.*.state
+        //{"metadata":{"indices":{"logstash-2020.01.31":{"state":"close"}}}}
+        String endpoint = "_cluster/state/metadata/" + index + "?filter_path=metadata.indices.*.state";
+        Request request = new Request("GET", endpoint);
+
+        Response response = client.getLowLevelClient().performRequest(request);
+        int statusCode = response.getStatusLine().getStatusCode();
+        String responseBody = EntityUtils.toString(response.getEntity());
+
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode responseJson = objectMapper.readTree(responseBody);
+        ClusterStateResponse clusterResponse = objectMapper.readValue(responseBody, ClusterStateResponse.class);
+
+        return clusterResponse.getState().metadata().getIndices().get(index).getState().name().equalsIgnoreCase("close");
     }
 
     /**
