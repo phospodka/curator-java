@@ -3,9 +3,11 @@ package net.resonanceb.curator.core.impl;
 import net.resonanceb.curator.core.IndexOptions;
 import net.resonanceb.curator.core.Operations;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.http.util.EntityUtils;
+import org.elasticsearch.ElasticsearchStatusException;
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesRequest;
 import org.elasticsearch.action.admin.cluster.repositories.get.GetRepositoriesResponse;
 import org.elasticsearch.action.admin.cluster.repositories.put.PutRepositoryRequest;
@@ -13,14 +15,9 @@ import org.elasticsearch.action.admin.cluster.snapshots.create.CreateSnapshotReq
 import org.elasticsearch.action.admin.cluster.snapshots.delete.DeleteSnapshotRequest;
 import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsRequest;
 import org.elasticsearch.action.admin.cluster.snapshots.get.GetSnapshotsResponse;
-import org.elasticsearch.action.admin.cluster.state.ClusterStateResponse;
 import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.admin.indices.forcemerge.ForceMergeRequest;
 import org.elasticsearch.action.admin.indices.open.OpenIndexRequest;
-import org.elasticsearch.action.admin.indices.segments.IndexSegments;
-import org.elasticsearch.action.admin.indices.segments.IndexShardSegments;
-import org.elasticsearch.action.admin.indices.segments.IndicesSegmentResponse;
-import org.elasticsearch.action.admin.indices.segments.ShardSegments;
 import org.elasticsearch.action.admin.indices.settings.get.GetSettingsRequest;
 import org.elasticsearch.action.admin.indices.settings.get.GetSettingsResponse;
 import org.elasticsearch.action.support.IndicesOptions;
@@ -40,8 +37,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.validation.constraints.NotNull;
 
 public class OperationsImpl implements Operations {
@@ -92,7 +92,7 @@ public class OperationsImpl implements Operations {
                     .snapshots(snapshotName);
 
             client.snapshot().delete(request, RequestOptions.DEFAULT);
-        } catch(SnapshotMissingException | IOException e) {
+        } catch(ElasticsearchStatusException | SnapshotMissingException | IOException e) {
             LOGGER.debug("Snapshot name:{} was not found for deletion", snapshotName);
         }
     }
@@ -247,79 +247,36 @@ public class OperationsImpl implements Operations {
     }
 
     /**
+     * todo base this on size as well as last I knew 5 GB was the breaking point size for a segment
      * Get the total number of segments for the requested index.
      * @param index name to query
      * @param client {@link Client} for elasticsearch
      * @return Array [number of shards, number of segments]
      */
-    private int[] getSegmentCount(String index, RestHighLevelClient client) throws IOException {
-        /*IndicesSegmentsRequest request = IndicesSegmentsAction.INSTANCE.newRequestBuilder(client)
-                .setIndices(index)
-                .request();
-
-        IndicesSegmentResponse response = client.admin().indices().segments(request).actionGet();
-        Map<String, IndexSegments> indexSegments = response.getIndices();
-
-        int segmentCount = 0;
-        int shardCount = 0;
-
-        // Navigate the layers to get the total number of segments across all shards of the index
-        for(Map.Entry<String, IndexSegments> indexEntry : indexSegments.entrySet()) {
-            IndexSegments indexSegment = indexEntry.getValue();
-
-            Map<Integer, IndexShardSegments> indexShardSegments = indexSegment.getShards();
-
-            for(Map.Entry<Integer, IndexShardSegments> indexShardEntry : indexShardSegments.entrySet()) {
-                IndexShardSegments indexShardSegment = indexShardEntry.getValue();
-
-                ShardSegments[] shardSegments = indexShardSegment.getShards();
-
-                for(ShardSegments shardSegment : shardSegments) {
-                    ++shardCount;
-                    segmentCount += shardSegment.getSegments().size();
-                }
-            }
-        }
-
-        return new int[]{shardCount, segmentCount};*/
-        //logstash-2020.01.31/_segments?filter_path=indices.*.shards.*.num_committed_segments
-        //{"indices":{"logstash-2020.01.31":{"shards":{"0":[{"num_committed_segments":9}],"1":[{"num_committed_segments":10}],"2":[{"num_committed_segments":7}],"3":[{"num_committed_segments":8}],"4":[{"num_committed_segments":4}]}}}}
-
-        String endpoint = index + "/_segments?filter_path=indices.*.shards.*.num_committed_segments";
+    public int[] getSegmentCount(String index, RestHighLevelClient client) throws IOException {
+        String endpoint = index + "/_segments?filter_path=indices.*.shards.*.num_committed_segments&ignore_unavailable=true";
         Request request = new Request("GET", endpoint);
 
         Response response = client.getLowLevelClient().performRequest(request);
         int statusCode = response.getStatusLine().getStatusCode();
-        String responseBody = EntityUtils.toString(response.getEntity());
 
         ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode responseJson = objectMapper.readTree(responseBody);
-        IndicesSegmentResponse indicesResponse = objectMapper.readValue(responseBody, IndicesSegmentResponse.class);
+        JsonNode responseJson = objectMapper.readTree(EntityUtils.toString(response.getEntity()));
+        Collection<Object> shards = Optional.ofNullable(responseJson.get("indices"))
+                .map(i -> i.get(index))
+                .map(i -> i.get("shards"))
+                .map(s -> objectMapper.convertValue(s, new TypeReference<Map<String, Object>>(){}))
+                .map(Map::values)
+                .orElse(Collections.emptyList());
 
-        Map<String, IndexSegments> indexSegments = indicesResponse.getIndices();
-
-        int segmentCount = 0;
-        int shardCount = 0;
-
-        // Navigate the layers to get the total number of segments across all shards of the index
-        for(Map.Entry<String, IndexSegments> indexEntry : indexSegments.entrySet()) {
-            IndexSegments indexSegment = indexEntry.getValue();
-
-            Map<Integer, IndexShardSegments> indexShardSegments = indexSegment.getShards();
-
-            for(Map.Entry<Integer, IndexShardSegments> indexShardEntry : indexShardSegments.entrySet()) {
-                IndexShardSegments indexShardSegment = indexShardEntry.getValue();
-
-                ShardSegments[] shardSegments = indexShardSegment.getShards();
-
-                for(ShardSegments shardSegment : shardSegments) {
-                    ++shardCount;
-                    segmentCount += shardSegment.getSegments().size();
-                }
-            }
+        int segments = 0;
+        for (Object shard : shards) {
+            segments += ((ArrayList<Map<String, Integer>>) shard)
+                    .get(0)
+                    .get("num_committed_segments");
         }
 
-        return new int[]{shardCount, segmentCount};
+        return new int[]{shards.size(), segments};
     }
 
     /**
@@ -330,28 +287,23 @@ public class OperationsImpl implements Operations {
      * @return boolean if index is closed
      * @throws IOException
      */
-    protected boolean isIndexClosed(String index, RestHighLevelClient client) throws IOException {
-        /*ClusterStateRequest request = ClusterStateAction.INSTANCE.newRequestBuilder(client)
-                .setIndices(index)
-                .request();
-
-        ClusterStateResponse response = client.admin().cluster().state(request).actionGet();
-
-        return response.getState().getMetaData().getIndices().get(index).getState().name().equalsIgnoreCase("close");*/
-        //_cluster/state/metadata/logstash-2020.01.31?filter_path=metadata.indices.*.state
-        //{"metadata":{"indices":{"logstash-2020.01.31":{"state":"close"}}}}
+    public boolean isIndexClosed(String index, RestHighLevelClient client) throws IOException {
         String endpoint = "_cluster/state/metadata/" + index + "?filter_path=metadata.indices.*.state";
         Request request = new Request("GET", endpoint);
 
         Response response = client.getLowLevelClient().performRequest(request);
         int statusCode = response.getStatusLine().getStatusCode();
-        String responseBody = EntityUtils.toString(response.getEntity());
 
         ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode responseJson = objectMapper.readTree(responseBody);
-        ClusterStateResponse clusterResponse = objectMapper.readValue(responseBody, ClusterStateResponse.class);
+        JsonNode responseJson = objectMapper.readTree(EntityUtils.toString(response.getEntity()));
 
-        return clusterResponse.getState().metadata().getIndices().get(index).getState().name().equalsIgnoreCase("close");
+        return Optional.ofNullable(responseJson.get("metadata"))
+                .map(m -> m.get("indices"))
+                .map(i -> i.get(index))
+                .map(i -> i.get("state"))
+                .map(JsonNode::textValue)
+                .map(s -> s.equalsIgnoreCase("close"))
+                .orElse(true);
     }
 
     /**
@@ -369,7 +321,7 @@ public class OperationsImpl implements Operations {
                     .snapshots(new String[]{snapshotName});
 
             client.snapshot().get(request, RequestOptions.DEFAULT);
-        } catch(SnapshotMissingException | IOException e) {
+        } catch(ElasticsearchStatusException | SnapshotMissingException | IOException e) {
             exists = false;
             LOGGER.debug("Snapshot name:{} is available to be created", snapshotName);
         }
